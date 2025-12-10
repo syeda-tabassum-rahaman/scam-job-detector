@@ -90,12 +90,7 @@ def preprocessing_pipeline() -> ColumnTransformer:
         FunctionTransformer(combine_text, validate=False),
         TfidfVectorizer(max_features=5000)
     )
-<<<<<<< HEAD
 
-
-=======
-    
->>>>>>> main
     preprocessor = make_column_transformer(
         (cat_transformer, categorical_columns),
         (ordinal_transformer, ordinal_columns),
@@ -110,15 +105,6 @@ def train_preprocessor(X_train: pd.DataFrame) -> np.ndarray:
     X_train_fitted = preprocessor.fit(X_train)
     X_train_preprocessed = X_train_fitted.transform(X_train)
 
-<<<<<<< HEAD
-# store preprocessor as dill file
-def save_preprocessor(preprocessor):
-    preprocessor_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname((__file__)))) , 'models', 'preprocessor.dill')
-    with open(preprocessor_path, "wb") as file:
-        dill.dump(model, file)
-    print(f"✅ preprocessor saved at {preprocessor_path}")
-    return None
-=======
     preprocessor_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname((__file__)))) , 'models', 'preprocessor.dill')
     with open(preprocessor_path, "wb") as file:
         dill.dump(X_train_fitted, file)
@@ -141,4 +127,3 @@ def test_preprocessor(X_test: pd.DataFrame) -> np.ndarray:
 if __name__ == "__main__":
     #initialize_grid_search()
     train_preprocessor()
->>>>>>> main
