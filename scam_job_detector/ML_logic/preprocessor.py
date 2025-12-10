@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import os
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.impute import SimpleImputer
@@ -83,13 +84,13 @@ def preprocessing_pipeline() -> ColumnTransformer:
 
     def combine_text(X):
         return X[text_columns].fillna("").agg(" ".join, axis=1)
-    
+
     text_transformer = make_pipeline(
         FunctionTransformer(combine_text, validate=False),
         TfidfVectorizer(max_features=5000)
     )
 
-    
+
     preprocessor = make_column_transformer(
         (cat_transformer, categorical_columns),
         (ordinal_transformer, ordinal_columns),
@@ -105,3 +106,10 @@ def train_preprocessor(X_train: pd.DataFrame, X_test: pd.DataFrame) -> np.ndarra
     X_test_preprocessed = preprocessor.transform(X_test)
     return X_train_preprocessed, X_test_preprocessed
 
+# store preprocessor as dill file
+def save_preprocessor(preprocessor):
+    preprocessor_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname((__file__)))) , 'models', 'preprocessor.dill')
+    with open(preprocessor_path, "wb") as file:
+        dill.dump(model, file)
+    print(f"✅ preprocessor saved at {preprocessor_path}")
+    return None
