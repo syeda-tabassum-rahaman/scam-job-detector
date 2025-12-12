@@ -20,6 +20,18 @@ test_structure:
 	@bash tests/test_structure.sh
 
 #======================#
+#     Data Pipeline    #
+#======================#
+clean_data:
+	python -m scam_job_detector.ML_logic.data
+
+preprocess:
+	python -m scam_job_detector.ML_logic.preprocessor
+
+run_model:
+	python -m scam_job_detector.ML_logic.model
+
+#======================#
 #          API         #
 #======================#
 
