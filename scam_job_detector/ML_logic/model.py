@@ -73,7 +73,7 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
             param_grid_logreg,
             cv=5,
             scoring='average_precision',
-            n_jobs=-1
+            n_jobs=2
         )
         grid_lr.fit(X_train_pp, y_train)
 
@@ -131,7 +131,7 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
         xgb = XGBClassifier(
             objective="binary:logistic",
             eval_metric="logloss",
-            n_jobs=-1,
+            n_jobs=2,
             random_state=42
         )
 
@@ -140,7 +140,7 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
             param_grid_xgb,
             cv=5,
             scoring='average_precision',
-            n_jobs=-1,
+            n_jobs=2,
             verbose=1
         )
         grid_xgb.fit(X_train_pp, y_train)
