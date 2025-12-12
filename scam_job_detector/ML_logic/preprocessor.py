@@ -25,14 +25,8 @@ categorical_columns = [
 # binary columns for binary encoding
 binary_columns = ['has_company_logo']
 
-# text columns for TF-IDF Vectorizer
-text_columns = [
-        'title',
-        'company_profile',
-        'description',
-        'requirements',
-        'benefits'
-]
+# text column
+text_columns = ['job_description']
 
 # preprocessor pipeline
 def preprocessing_pipeline(text=True, text_only=False) -> ColumnTransformer:
@@ -47,13 +41,11 @@ def preprocessing_pipeline(text=True, text_only=False) -> ColumnTransformer:
         OneHotEncoder(handle_unknown='ignore')
     )
 
-    def combine_text(X):
-        return X[text_columns].fillna("").agg(" ".join, axis=1)
-
-    text_transformer = make_pipeline(
-        FunctionTransformer(combine_text, validate=False),
-        TfidfVectorizer(max_features=5000)
+    text_transformer = make_column_transformer(
+    (TfidfVectorizer(max_features=5000), "job_description"),
+    remainder="drop"
     )
+
     if text_only:
         preprocessor = make_column_transformer(
             (text_transformer, text_columns)
