@@ -23,7 +23,6 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-# http://127.0.0.1:8000/predict?pickup_datetime=2014-07-06+19:18:00&pickup_longitude=-73.950655&pickup_latitude=40.783282&dropoff_longitude=-73.984365&dropoff_latitude=40.769802&passenger_count=2
 @app.get("/predict")
 def predict(
         job_id: str = None,
@@ -41,6 +40,7 @@ def predict(
         company_profile: str = None,
         description: str = None,
         requirements: str = None,
+        telecommuting: str = None, 
         benefits: str = None,  # Predicted JD
     ):
     """
@@ -74,6 +74,7 @@ def predict(
         'company_profile': company_profile,
         'description': description,
         'requirements': requirements,
+        'telecommuting': telecommuting,
         'benefits': benefits
     }, index=[0])
 

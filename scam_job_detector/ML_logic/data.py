@@ -37,20 +37,25 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
         tokens = [WordNetLemmatizer().lemmatize(word, pos='v') for word in tokens]
 
         return ' '.join(tokens)
+    # text columns for TF-IDF Vectorizer
+    text_columns = [
+            'title',
+            'company_profile',
+            'description',
+            'requirements',
+            'benefits'
+    ]
+    df[text_columns] = df[text_columns].fillna("").astype(str)
 
+    df["job_description"] = df[text_columns].agg(" ".join, axis=1).str.strip()
     # Clean text data
-    cols = ['title', 'company_profile', 'description', 'requirements', 'benefits']
+    df['job_description'] = df['job_description'].fillna('missing value')
 
-    df = df.copy()
-
-    for col in cols:
-        df[col] = df[col].fillna('missing value')
-
-    for col in cols:
-        df[col] = df[col].apply(preprocessing)
+    df['job_description'] = df['job_description'].apply(preprocessing)
 
     # extracting country ID
     df['country'] = df['location'].astype(str).apply(lambda x: x.split(',')[0])
+
 
     # Drop irrelevant columns
     df.drop(columns=['department',
@@ -60,6 +65,11 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
                      'telecommuting',
                      'required_education',
                      'location',
+                     'title',
+                     'company_profile',
+                     'description',
+                     'requirements',
+                     'benefits',
                      'job_id'], inplace=True)
 
     print("✅ data cleaned")

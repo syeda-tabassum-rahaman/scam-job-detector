@@ -219,5 +219,5 @@ def load_preprocessor():
     return preprocessor
 
 if __name__ == "__main__":
-    initialize_all_grid_searches(run_logreg=True, run_xgb=True)
-    # load_model()
+    # initialize_all_grid_searches(run_logreg=True, run_xgb=True)
+    load_model()
