@@ -196,11 +196,61 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
 
     return None
 
+def final_model():
+    # Load cleaned dataset
+    base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    clean_data_path = os.path.join(base_path, "raw_data", "data_cleaned.csv")
+    df = pd.read_csv(clean_data_path)
+    print("✅ Clean data loaded")
+
+    # Train-test split
+    X = df.drop(columns=["fraudulent"])
+    y = df["fraudulent"]
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    # Preprocess once
+    X_train_pp, preprocessor = train_preprocessor(X_train)
+    X_test_pp = test_preprocessor(X_test)
+
+    # Paths for saving models
+    models_folder = os.path.join(base_path, "models")
+    os.makedirs(models_folder, exist_ok=True)
+
+    model_path = os.path.join(models_folder, "final_model.dill")
+
+
+    xgb = XGBClassifier(
+        objective="binary:logistic",
+        eval_metric="logloss",
+        n_jobs=-1,
+        random_state=42,
+        learning_rate=0.1,
+        max_depth=11,
+        n_estimators=275
+    )
+
+    xgb.fit(X_train_pp, y_train)
+    with open(model_path, "wb") as f:
+        dill.dump(xgb, f)
+
+    y_pred = xgb.predict(X_test_pp)
+
+    print(f'''
+        Model Performance
+        Recall: {recall_score(y_test, y_pred)},
+        Precision: {precision_score(y_test, y_pred)},
+        Balanced Accuracy: {balanced_accuracy_score(y_test, y_pred)},
+        F1 Score: {f1_score(y_test, y_pred)}
+        ''')
+
 def load_model():
     """
     Load the model from the specified path
     """
-    model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname((__file__)))) , 'models', 'model_winner.dill')
+    model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname((__file__)))) , 'models', 'final_model.dill')
 
     with open(model_path, "rb") as file:
         model = dill.load(file)
@@ -219,5 +269,12 @@ def load_preprocessor():
     return preprocessor
 
 if __name__ == "__main__":
-    initialize_all_grid_searches(run_logreg=True, run_xgb=True)
-    # load_model()
+    base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    models_folder = os.path.join(base_path, "models")
+    model_path = os.path.join(models_folder, "final_model.dill")
+    if os.path.exists(model_path):
+        load_model()
+    else:
+        final_model()
+        load_model()
+    # initialize_all_grid_searches(run_logreg=True, run_xgb=True)
