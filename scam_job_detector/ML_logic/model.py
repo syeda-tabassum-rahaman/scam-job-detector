@@ -273,6 +273,7 @@ if __name__ == "__main__":
     models_folder = os.path.join(base_path, "models")
     model_path = os.path.join(models_folder, "final_model.dill")
     if os.path.exists(model_path):
+        final_model()
         load_model()
     else:
         final_model()
