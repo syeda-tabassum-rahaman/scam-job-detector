@@ -18,7 +18,7 @@ import dill
 categorical_columns = [
     'country',
     'industry',
-    'function',
+#    'function',
     'employment_type'
 ]
 
@@ -32,7 +32,7 @@ text_columns = ['job_description']
 def preprocessing_pipeline(text=True, text_only=False) -> ColumnTransformer:
 
     cat_transformer = make_pipeline(
-        SimpleImputer(strategy='constant', fill_value='missing'),
+        SimpleImputer(strategy='constant', fill_value='Missing'),
         OneHotEncoder(handle_unknown='ignore')
     )
 
@@ -42,7 +42,7 @@ def preprocessing_pipeline(text=True, text_only=False) -> ColumnTransformer:
     )
 
     text_transformer = make_column_transformer(
-    (TfidfVectorizer(max_df=0.9,min_df=2,ngram_range=(1,2), sublinear_tf= False, max_features=None), "job_description"),
+    (TfidfVectorizer(max_df=0.9, min_df=2, ngram_range=(1,2), sublinear_tf=False, max_features=None), "job_description"),
     remainder="drop"
     )
 
