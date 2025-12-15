@@ -3,8 +3,3 @@ nltk
 scikit-learn
 uvicorn
 fastapi
-xgboost
-# tensorflow
-# transformers 
-# tf_keras
-# torch
