@@ -87,9 +87,11 @@ def predict(
 
     # Generate prediction based up processed features.
     prediction = model.predict(X_new_preprocessed)[0]
+    prediction_proba = model.predict_proba(X_new_preprocessed)[0]
 
     return {
         "fraudulent": float(prediction),
+        "prob_fraudulent": float(prediction_proba),
     }
 
 
