@@ -69,12 +69,13 @@ def shapley(X_new_preprocessed):
     text_df["word"] = text_df["feature"].apply(extract_word)
 
     shap_features_text = text_df["word"].tolist()
-    shap_values_list =text_df["shap_value"].tolist()
+    shap_text_list =text_df["shap_value"].tolist()
     shap_features_binary = binary_df["feature"].tolist()
     shap_values_binary= binary_df["shap_value"].tolist()
     shap_features_country = country_df["feature"].tolist()
     shap_values_country= country_df["shap_value"].tolist()
-    return shap_features_text, shap_values_list, shap_features_binary ,shap_values_binary, shap_features_country, shap_values_country
+
+    return shap_features_text, shap_text_list, shap_features_binary ,shap_values_binary, shap_features_country, shap_values_country
 
 # def generate_wordcloud(shap_features, shap_values_list):
 #     # Create a dictionary of feature names and their corresponding SHAP values
