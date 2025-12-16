@@ -45,3 +45,6 @@ secrets.toml
 
 # User defined extras
 # Complete to your desire
+*_lk.py
+ExploringFeatureExtraction.ipynb
+syeda_LLM_copy_lars.ipynb
