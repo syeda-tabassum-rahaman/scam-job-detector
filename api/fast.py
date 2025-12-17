@@ -46,15 +46,6 @@ def predict(
     Make a single course prediction.
     
     """
-    # # Parse datetime string
-    # eastern = pytz.timezone("US/Eastern")
-    # pickup_dt_naive = datetime.strptime(pickup_datetime, "%Y-%m-%d %H:%M:%S")
-    # pickup_dt_localized = eastern.localize(pickup_dt_naive)
-
-    # # Convert to UTC if your model was trained on UTC timestamps
-    # pickup_datetime_utc = pickup_dt_localized.astimezone(pytz.UTC)
-
-
 
     # Prepare the input DataFrame
     X_new = pd.DataFrame({
