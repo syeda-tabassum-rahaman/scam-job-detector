@@ -1,3 +1,11 @@
+"""
+Model training and persistence utilities for the scam-job detector.
+
+This module contains helper functions to run grid searches for baseline
+models, train a final model, and load saved models and preprocessors
+from disk.
+"""
+
 import os
 import dill
 import pandas as pd
@@ -12,20 +20,21 @@ from scam_job_detector.ML_logic.preprocessor import train_preprocessor, test_pre
 
 def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
     """
-    Run grid-searches for baseline models only if requested.
-    Preprocess data only once.
-    Save best estimators for each model.
-    Finally compute the best model ("winner model") based on test AP score.
+    Run grid searches for baseline models and save best estimators
+
+    the function preprocesses the data once, runs optional grid searches
+    for logistic regression and xgboost, saves best estimators and selects
+    a winner model based on test average precision score
     """
 
-    # Load cleaned dataset
+    # load cleaned dataset
     base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     clean_data_path = os.path.join(base_path, "raw_data", "data_cleaned.csv")
 
     df = pd.read_csv(clean_data_path)
     print("✅ Clean data loaded")
 
-    # Train-test split
+    # train-test split
     X = df.drop(columns=["fraudulent"])
     y = df["fraudulent"]
 
@@ -33,11 +42,11 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
         X, y, test_size=0.2, stratify=y
     )
 
-    # Preprocess once
+    # preprocess once
     X_train_pp = train_preprocessor(X_train)
     X_test_pp = test_preprocessor(X_test)
 
-    # Paths for saving models
+    # paths for saving models
     models_folder = os.path.join(base_path, "models")
     os.makedirs(models_folder, exist_ok=True)
 
@@ -45,15 +54,16 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
     xgb_path = os.path.join(models_folder, "model_xgb.dill")
     winner_path = os.path.join(models_folder, "model_winner.dill")
 
-    # Store results for winner selection
+    # store results for winner selection
     model_scores = {}
 
     # ====================================================== #
-    # 1️⃣ LOGISTIC REGRESSION GRID SEARCH (if requested)
+    # 1️⃣ logistic regression grid search (if requested)
     # ====================================================== #
     if run_logreg:
         print("\n🔍 Running Logistic Regression Grid Search...")
 
+        # create parameter grid for logistic regression
         param_grid_logreg = {
             "penalty": ["l2"],
             "C": [0.03, 0.1, 0.3, 1, 3, 10],
@@ -62,6 +72,7 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
             "max_iter": [2000],
         }
 
+        # create GridSearchCV for logistic regression and run fit
         grid_lr = GridSearchCV(
             LogisticRegression(),
             param_grid_logreg,
@@ -71,20 +82,21 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
         )
         grid_lr.fit(X_train_pp, y_train)
 
+        # get best estimator and save to disk
         best_lr = grid_lr.best_estimator_
 
         with open(logreg_path, "wb") as f:
             dill.dump(best_lr, f)
 
-        # Results
+        # results
         print("✅ Grid search for LR completed")
 
-        # Inspect best estimator:
+        # inspect best estimator
         print(f"Best score: {grid_lr.best_score_}")
         print(f"Best parameters:, {grid_lr.best_params_}")
         print(f"Best estimator:, {grid_lr.best_estimator_}")
 
-        # model performance on test set
+        # evaluate best logistic regression on test set
         y_pred = grid_lr.predict(X_test_pp)
         print(f'''
             Model Performance
@@ -95,14 +107,14 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
             ''')
 
     else:
-        print("\n📂 Loading previously saved Logistic Regression model...")
+        print("\n📂 loading previously saved Logistic Regression model...")
         if os.path.exists(logreg_path):
             with open(logreg_path, "rb") as f:
                 best_lr = dill.load(f)
         else:
             best_lr = None
 
-    # Evaluate LR if available
+    # evaluate lr if available
     if best_lr is not None:
         y_pred_lr = best_lr.predict(X_test_pp)
         ap_lr = average_precision_score(y_test, y_pred_lr)
@@ -115,6 +127,7 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
     if run_xgb:
         print("\n🔍 Running XGBoost Grid Search...")
 
+        # create parameter grid for xgboost
         param_grid_xgb = {
             "n_estimators": [300, 600],
             "learning_rate": [0.1],
@@ -130,6 +143,7 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
             n_jobs=-1
         )
 
+        # create GridSearchCV for xgboost and run fit
         grid_xgb = GridSearchCV(
             xgb,
             param_grid_xgb,
@@ -140,21 +154,23 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
         )
         grid_xgb.fit(X_train_pp, y_train)
 
+        # get best estimator and save to disk
         best_xgb = grid_xgb.best_estimator_
 
         with open(xgb_path, "wb") as f:
             dill.dump(best_xgb, f)
 
         print(f"✅ Saved XGBoost model at {xgb_path}")
-                # Results
+
+        # results
         print("✅ Grid search for XGboost completed")
 
-        # Inspect best estimator:
+        # inspect best estimator
         print(f"Best score: {grid_xgb.best_score_}")
         print(f"Best parameters:, {grid_xgb.best_params_}")
         print(f"Best estimator:, {grid_xgb.best_estimator_}")
 
-        # model performance on test set
+        # evaluate best xgboost on test set
         y_pred = best_xgb.predict(X_test_pp)
         print(f'''
             Model Performance
@@ -166,14 +182,14 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
 
 
     else:
-        print("\n📂 Loading previously saved XGBoost model...")
+        print("\n📂 loading previously saved XGBoost model...")
         if os.path.exists(xgb_path):
             with open(xgb_path, "rb") as f:
                 best_xgb = dill.load(f)
         else:
             best_xgb = None
 
-    # Evaluate XGB if available
+    # evaluate xgb if available
     if best_xgb is not None:
         y_pred_xgb = best_xgb.predict(X_test_pp)
         y_pred_xgb_proba = best_xgb.predict_proba(X_test_pp)[:, 1]
@@ -200,13 +216,13 @@ def initialize_all_grid_searches(run_logreg=True, run_xgb=True):
     return None
 
 def final_model():
-    # Load cleaned dataset
+    # load cleaned dataset
     base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     clean_data_path = os.path.join(base_path, "raw_data", "data_cleaned.csv")
     df = pd.read_csv(clean_data_path)
     print("✅ Clean data loaded")
 
-    # Train-test split
+    # train-test split
     X = df.drop(columns=["fraudulent"])
     y = df["fraudulent"]
 
@@ -214,34 +230,41 @@ def final_model():
         X, y, test_size=0.2, stratify=y
     )
 
-    # Preprocess once
+    # preprocess once
     X_train_pp = train_preprocessor(X_train)
     X_test_pp = test_preprocessor(X_test)
 
-    # Paths for saving models
+    # paths for saving models
     models_folder = os.path.join(base_path, "models")
     os.makedirs(models_folder, exist_ok=True)
 
     model_path = os.path.join(models_folder, "final_model.dill")
 
+    # creating weight for class imbalance
+    # pos = sum(y_train)
+    # neg = len(y_train) - pos
+    # spw = neg / pos
 
+    # configure final xgboost model hyperparameters
     xgb = XGBClassifier(
         objective="binary:logistic",
         eval_metric="logloss",
         n_jobs=-1,
-        learning_rate=0.1,
+        learning_rate=0.05,
         min_child_weight=1,
         reg_lambda=1,
         max_depth=11,
+        # scale_pos_weight=spw,
         n_estimators=275
     )
-
+    # train final xgboost model and persist to disk
     xgb.fit(X_train_pp, y_train)
     with open(model_path, "wb") as f:
         dill.dump(xgb, f)
 
+    # evaluate final model on test set
     y_pred = xgb.predict(X_test_pp)
-    y_pred_xgb_proba =xgb.predict_proba(X_test_pp)[:, 1]
+    y_pred_xgb_proba = xgb.predict_proba(X_test_pp)[:, 1]
     print(f'''
         Model Performance
         Recall: {recall_score(y_test, y_pred)},
@@ -249,39 +272,46 @@ def final_model():
         Balanced Accuracy: {balanced_accuracy_score(y_test, y_pred)},
         F1 Score: {f1_score(y_test, y_pred)},
         AUC: {roc_auc_score(y_test, y_pred_xgb_proba)}
-        Probas: {y_pred_xgb_proba[y_pred_xgb_proba >= .05]}
-        ''')
+        ''' )
 
 def load_model():
     """
-    Load the model from the specified path
+    Load the model from the saved final_model file.
     """
+
     model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname((__file__)))) , 'models', 'final_model.dill')
 
     with open(model_path, "rb") as file:
         model = dill.load(file)
     print("✅ Model loaded")
+
     return model
 
 def load_preprocessor():
     """
     Load the preprocessor fitted with training data
     """
+
     model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname((__file__)))) , 'models', 'preprocessor.dill')
 
     with open(model_path, "rb") as file:
         preprocessor = dill.load(file)
     print("✅ Preprocessor loaded")
+
     return preprocessor
 
 if __name__ == "__main__":
+    
+    # initialize_all_grid_searches(run_logreg=True, run_xgb=True) # uncomment when you want to use grid search
+
     base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     models_folder = os.path.join(base_path, "models")
     model_path = os.path.join(models_folder, "final_model.dill")
+
     if os.path.exists(model_path):
         # final_model()
         load_model()
     else:
         final_model()
         load_model()
-    # initialize_all_grid_searches(run_logreg=True, run_xgb=True)
+    

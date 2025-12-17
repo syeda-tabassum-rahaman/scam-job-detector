@@ -1,92 +1,120 @@
+"""
+Simple fastapi app exposing prediction and explanation endpoints
+
+This module provides a small api to make single job-posting fraud
+predictions and return shapley-based explanations
+"""
+
 import pandas as pd
 from scam_job_detector.ML_logic.model import load_model
 from scam_job_detector.ML_logic.data import clean_data
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
-# import dill
 from scam_job_detector.ML_logic.data import clean_data
 from scam_job_detector.ML_logic.preprocessor import test_preprocessor
 from scam_job_detector.ML_logic.model import load_model
 from scam_job_detector.ML_logic.shapley import shapley
-
-
+import json
+# create api instance
 app = FastAPI()
 
-# Allowing all middleware is optional, but good practice for dev purposes
+# allowing all middleware is optional, but good practice for dev purposes
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.get("/predict")
 def predict(
-        job_id: str = None,
         location: str = None,
         industry: str = None,
-        function_str: str = None,
         employment_type: str = None,
-        required_experience: str = None,
-        required_education: str = None,
         has_company_logo: str = None,
-        has_questions: str = None,
         department: str = None,
-        salary_range: str = None,
-        title: str = None,
-        company_profile: str = None,
         description: str = None,
-        requirements: str = None,
-        telecommuting: str = None, 
-        benefits: str = None,  # Predicted JD
+        # job_id: str = None,
+        # function_str: str = None,
+        # required_experience: str = None,
+        # required_education: str = None,
+        # has_questions: str = None,
+        # salary_range: str = None,
+        # title: str = None,
+        # company_profile: str = None,
+        # requirements: str = None,
+        # telecommuting: str = None, 
+        # benefits: str = None,  # Predicted JD
     ):
     """
-    Make a single course prediction.
-    
+    Make a single prediction and return shapley-based explanations
+
+    Accepts job posting fields as query parameters and returns a fraud
+    probability, binary prediction and lists of top shapley features
     """
 
-    # Prepare the input DataFrame
+    # prepare the input DataFrame from query params
     X_new = pd.DataFrame({
-        'job_id': job_id,
         'location': location,
         'industry': industry,
-        'function': function_str,
         'employment_type': employment_type,
-        'required_experience': required_experience,
-        'required_education': required_education,
         'has_company_logo': has_company_logo,
-        'has_questions': has_questions,
         'department': department,
-        'salary_range': salary_range,
-        'title': title,
-        'company_profile': company_profile,
         'description': description,
-        'requirements': requirements,
-        'telecommuting': telecommuting,
-        'benefits': benefits
+
+        # all of the below listed columns are required to match original dataframe format
+        'job_id': None,
+        'function': None,
+        'required_experience': None,
+        'required_education': None,
+        'has_questions': None,
+        'salary_range': None,
+        'title': None,
+        'company_profile': None,
+        'requirements': None,
+        'telecommuting': None,
+        'benefits': None
     }, index=[0])
 
-    # Loads preprocessed features into X_processed variable
+    # clean raw input and transform with fitted preprocessor
     X_new_cleaned = clean_data(X_new)
     X_new_preprocessed = test_preprocessor(X_new_cleaned)
 
-    # Loading the model.
+    # load trained model from disk
     model = load_model()
 
-    # Generate prediction based up processed features.
+    # generate prediction and probability for positive class
     prediction = model.predict(X_new_preprocessed)[0]
     prediction_proba = model.predict_proba(X_new_preprocessed)[0][1].tolist()
 
-    # shapley values
-    shap_features_text, shap_text_values, shap_features_binary ,shap_values_binary, shap_features_country, shap_values_country = shapley(X_new_preprocessed)
-    print(shap_features_text)
+    # # compute shapley explanations for the preprocessed input
+    # shap_features_text, shap_text_values, shap_features_binary, shap_values_binary, shap_features_country, shap_values_country = shapley(X_new_preprocessed)
 
 
+    # return values
     return {
-        "fraudulent": float(prediction),
+        "fraudulent": int(prediction),
         "prob_fraudulent": float(round(prediction_proba, 4)),
+        "column_names": X_new_cleaned.columns.tolist(),
+        "column_values": X_new_cleaned.loc[0].tolist()
+
+    }
+
+@app.get("/explain")
+def explain(column_names: str = None, column_values: str = None):
+    column_names = json.loads(column_names)     # list
+    column_values = json.loads(column_values)   # list
+
+    
+    X_new_cleaned = pd.DataFrame([column_values], columns=column_names)
+    X_new_preprocessed = test_preprocessor(X_new_cleaned)
+
+    # compute shapley explanations for the preprocessed input
+    shap_features_text, shap_text_values, shap_features_binary, shap_values_binary, shap_features_country, shap_values_country = shapley(X_new_preprocessed)
+    # return values
+    return {
         'shap_features_text': shap_features_text,
         'shap_text_values': shap_text_values,
         'shap_features_binary': shap_features_binary,
@@ -98,4 +126,5 @@ def predict(
 
 @app.get("/")
 def root():
+    # simple health endpoint
     return {"greeting": "Hello"}

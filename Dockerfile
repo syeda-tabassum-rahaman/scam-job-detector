@@ -14,7 +14,8 @@ WORKDIR /app
 COPY scam_job_detector scam_job_detector
 COPY api api
 COPY models models
-COPY requirements_test.txt requirements.txt
+COPY raw_data raw_data
+COPY requirements_docker.txt requirements.txt
 COPY setup.py setup.py
 
 # -----------------------------
