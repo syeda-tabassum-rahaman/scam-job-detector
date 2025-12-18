@@ -26,7 +26,7 @@ def shapley(X_new_preprocessed):
     Returns:
         tuples of (text features, text shap values, binary features, binary shap values, country features, country shap values)
     """
-
+    
     # load model and preprocessor from disk
     model = load_model()
     preprocessor = load_preprocessor()
@@ -113,82 +113,129 @@ def shapley(X_new_preprocessed):
 # ====================================================== #
 
 def explain_xgb(X_new):
-
-    # load model and preprocessor from disk
+   
+    # load model and preprocessor from disk (assumed to exist in your codebase)
     model = load_model()
     preprocessor = load_preprocessor()
 
-    # preprocess X_new
+    # input: X_new must be in the same raw format the preprocessor expects
     X_new_preprocessed = preprocessor.transform(X_new)
 
-    #Get prediction contributions
-    contribs = model.get_booster().predict(
-        xgb.DMatrix(X_new_preprocessed),
-        pred_contribs=True
-    )
+    # get per-feature prediction contributions (SHAP-style + bias as last column)
+    dmat = xgb.DMatrix(X_new_preprocessed)
+    contribs = model.get_booster().predict(dmat, pred_contribs=True)
 
-    # Build contributions dataframe
-
+    # build contributions dataframe for the first row in X_new
     feature_names = preprocessor.get_feature_names_out()
-    contrib_df = pd.DataFrame({
-        "feature": feature_names,
-        "contribution": contribs[0, :-1]  # exclude bias
-    })
-    contrib_df["abs_contribution"] = contrib_df.contribution.abs()
+    contrib_df = pd.DataFrame(
+        {
+            "feature": feature_names,
+            "contribution": contribs[0, :-1],  # exclude bias term
+        }
+    )
+    contrib_df["abs_contribution"] = contrib_df["contribution"].abs()
 
-    # Create mask to get text, binary, and country features
-    xgb_text_mask = pd.DataFrame(contrib_df.feature.str.contains("tfidfvectorizer__"))
+    # split text vs non-text features
+    text_mask = contrib_df["feature"].str.contains("tfidfvectorizer__", na=False)
 
-    # Apply mask to get dataframes
-    xgb_text_df = pd.DataFrame(contrib_df[xgb_text_mask])
-    xgb_text_df = pd.DataFrame(xgb_text_df[xgb_text_df.abs_contribution>0])
-    xgb_cat_df = pd.DataFrame(contrib_df[~xgb_text_mask])
+    xgb_text_df = contrib_df.loc[text_mask].copy()
+    xgb_cat_df  = contrib_df.loc[~text_mask].copy()
 
-    #create function to extract non-text contributions
-    def extract_non_text_contributions(df):
+    # keep only non-zero contributions for text features (optional)
+    xgb_text_df = xgb_text_df.loc[xgb_text_df["abs_contribution"] > 0].copy()
+
+    # explanations for non-text contributions
+    def extract_non_text_contributions(df: pd.DataFrame) -> list[str]:
         explanations = []
-        for _, row in df.iterrows():
-            if "has_company_logo" in row.feature:
-                if "_0" in row.feature:
-                    if row.contribution > 0:
+        for row in df.itertuples(index=False):
+            feat = row.feature
+            contrib = row.contribution
+
+            if "has_company_logo" in feat:
+                # more robust than "_0" in feat (avoids accidental matches)
+                if feat.endswith("_0"):
+                    if contrib > 0:
                         explanations.append("Missing company logo increases the likelihood that this job posting is fake.")
                     else:
                         explanations.append("Despite the missing company logo, other signals suggest this posting may be legitimate.")
-                if "_1" in row.feature:
-                    explanations.append("The presence of a company logo increases the credibility of the job posting.")
-            elif "country_" in row.feature:
-                country = row.feature.split("country_")[-1]
-                if row.contribution > 0:
-                    explanations.append(f"Job postings originating from {country} are statistically more likely to be fraudulent.")
+                elif feat.endswith("_1"):
+                    if contrib > 0:
+                        explanations.append("The presence of a company logo increases the likelihood that this job posting is fake (per this model).")
+                    else:
+                        explanations.append("The presence of a company logo increases the credibility of the job posting.")
+                else:
+                    explanations.append("Company logo feature contributes, but its exact level is unclear.")
+
+            elif "country_" in feat:
+                country = feat.split("country_")[-1]
+                if contrib > 0:
+                    explanations.append(f"Job postings originating from {country} are statistically more likely to be fraudulent (per training data).")
                 else:
                     explanations.append(f"Job postings originating from {country} are generally less associated with fraud in the training data.")
+
             else:
-                explanations.append("No specific explanation available.")
+                # fallback: show a generic statement including the feature name
+                direction = "increases" if contrib > 0 else "decreases"
+                explanations.append(f"Feature '{feat}' {direction} the fraud score (contribution={contrib:.4f}).")
+
         return explanations
 
-    #Apply function to X_new
-    xgb_cat_df["explanation"] =  xgb_cat_df["feature"].apply(extract_non_text_contributions(X_new))
+    xgb_cat_df["explanation"] = extract_non_text_contributions(xgb_cat_df)
 
-    #Create function to extract word from feature name
-    def extract_word(feature):
-        return feature.split("tfidfvectorizer__")[-1]
+    # word extraction for text features
+    def extract_word(feature: str) -> str:
+        return feature.split("tfidfvectorizer__", 1)[-1]
 
-    # Apply function to xgb_text_df
     xgb_text_df["word"] = xgb_text_df["feature"].apply(extract_word)
 
-    # select only top 20 positive contributions
-    xgb_text_df_fake = xgb_text_df[xgb_text_df["contribution"]>0].sort_values("contribution",ascending=False).head(20)
+    # top contributing words
+    xgb_text_df_fake = (
+        xgb_text_df.loc[xgb_text_df["contribution"] > 0]
+        .sort_values("contribution", ascending=False)
+        .head(20)
+    )
 
-    # select only top 20 negative contributions
-    xgb_text_df_real = xgb_text_df[xgb_text_df["contribution"]<0].sort_values("contribution",ascending=True).head(20)
+    xgb_text_df_real = (
+        xgb_text_df.loc[xgb_text_df["contribution"] < 0]
+        .sort_values("contribution", ascending=True)
+        .head(20)
+    )
 
+    # outputs for debugging
+    # print("X_new (raw):")
+    # print(pd.DataFrame(X_new).head(1))
+
+    # print("\nNon-text explanations (top 30 by absolute contribution):")
+    # print(
+    #     xgb_cat_df.sort_values("abs_contribution", ascending=False)
+    #     .head(30)[["feature", "contribution", "explanation"]]
+    #     .to_string(index=False)
+    # )
+
+    # print("\nTop 20 words pushing towards FAKE:")
+    # print(xgb_text_df_fake[["word", "contribution"]].to_string(index=False))
+
+    # print("\nTop 20 words pushing towards REAL:")
+    # print(xgb_text_df_real[["word", "contribution"]].to_string(index=False))
+
+    # If you still want the lists:
     non_text_contributions = xgb_cat_df["explanation"].tolist()
     text_contributions_words_fake = xgb_text_df_fake["word"].tolist()
     text_contributions_contribution_fake = xgb_text_df_fake["contribution"].tolist()
     text_contributions_words_real = xgb_text_df_real["word"].tolist()
     text_contributions_contribution_real = xgb_text_df_real["contribution"].tolist()
+    
+    print(f"✅ Factors driving the prediction examined")
 
     return non_text_contributions, text_contributions_words_fake, text_contributions_contribution_fake, text_contributions_words_real, text_contributions_contribution_real
 
 if __name__ == "__main__":
-    explain_xgb()
+     # load cleaned dataset
+    base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    clean_data_path = os.path.join(base_path, "raw_data", "data_cleaned.csv")
+
+    df = pd.read_csv(clean_data_path)
+
+
+    X_new = df.sample(1).drop(columns='fraudulent')
+    explain_xgb(X_new)
