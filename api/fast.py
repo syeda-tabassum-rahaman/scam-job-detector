@@ -14,7 +14,7 @@ import os
 from scam_job_detector.ML_logic.data import clean_data
 from scam_job_detector.ML_logic.preprocessor import test_preprocessor
 from scam_job_detector.ML_logic.model import load_model
-from scam_job_detector.ML_logic.shapley import shapley
+from scam_job_detector.ML_logic.explainability import explain_xgb
 import json
 # create api instance
 app = FastAPI()
@@ -102,6 +102,27 @@ def predict(
 
     }
 
+# @app.get("/explain")
+# def explain(column_names: str = None, column_values: str = None):
+#     column_names = json.loads(column_names)     # list
+#     column_values = json.loads(column_values)   # list
+
+    
+#     X_new_cleaned = pd.DataFrame([column_values], columns=column_names)
+#     X_new_preprocessed = test_preprocessor(X_new_cleaned)
+
+#     # compute shapley explanations for the preprocessed input
+#     shap_features_text, shap_text_values, shap_features_binary, shap_values_binary, shap_features_country, shap_values_country = shapley(X_new_preprocessed)
+#     # return values
+#     return {
+#         'shap_features_text': shap_features_text,
+#         'shap_text_values': shap_text_values,
+#         'shap_features_binary': shap_features_binary,
+#         'shap_values_binary': shap_values_binary,
+#         'shap_features_country': shap_features_country,
+#         'shap_values_country': shap_values_country
+#     }
+
 @app.get("/explain")
 def explain(column_names: str = None, column_values: str = None):
     column_names = json.loads(column_names)     # list
@@ -109,20 +130,21 @@ def explain(column_names: str = None, column_values: str = None):
 
     
     X_new_cleaned = pd.DataFrame([column_values], columns=column_names)
-    X_new_preprocessed = test_preprocessor(X_new_cleaned)
 
     # compute shapley explanations for the preprocessed input
-    shap_features_text, shap_text_values, shap_features_binary, shap_values_binary, shap_features_country, shap_values_country = shapley(X_new_preprocessed)
+    non_text_contributions, text_contributions_words_fake, text_contributions_contribution_fake, text_contributions_words_real, text_contributions_contribution_real = explain_xgb(X_new_cleaned)
     # return values
     return {
-        'shap_features_text': shap_features_text,
-        'shap_text_values': shap_text_values,
-        'shap_features_binary': shap_features_binary,
-        'shap_values_binary': shap_values_binary,
-        'shap_features_country': shap_features_country,
-        'shap_values_country': shap_values_country
+        'non_text_contributions': non_text_contributions,
+        'text_contributions_words_fake': text_contributions_words_fake,
+        'text_contributions_contribution_fake': text_contributions_contribution_fake,
+        'text_contributions_words_real': text_contributions_words_real,
+        'text_contributions_contribution_real': text_contributions_contribution_real
     }
 
+
+
+#non_text_contributions, text_contributions_words_fake, text_contributions_contribution_fake, text_contributions_words_real, text_contributions_contribution_real
 
 @app.get("/")
 def root():
